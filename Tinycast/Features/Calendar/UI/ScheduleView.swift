@@ -116,8 +116,5 @@ private struct MeetingRow: View {
         .accessibilityAddTraits(.isButton)
     }
 
-    /// A meeting under way says so; everything else reads as the clock time it starts.
-    private var trailing: String {
-        meeting.isInProgress(now: now) ? "Now" : MeetingTimeFormat.clock(meeting.start)
-    }
+    private var trailing: String { MeetingTimeFormat.subtitle(for: meeting, now: now) }
 }

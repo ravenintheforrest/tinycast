@@ -58,6 +58,11 @@ enum MeetingTimeFormat {
     private static let formatter: Date.FormatStyle = .dateTime.hour().minute()
 
     static func clock(_ date: Date) -> String { date.formatted(formatter) }
+
+    /// "Now" while a meeting is under way, else its clock time — every row that trails a time.
+    static func subtitle(for meeting: MeetingEvent, now: Date) -> String {
+        meeting.isInProgress(now: now) ? "Now" : clock(meeting.start)
+    }
 }
 
 /// Actions for a meeting, shared by the card and every schedule row.

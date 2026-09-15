@@ -177,10 +177,11 @@ final class CalendarCoordinator {
         }
         let meetings =
             settings.calendarLauncherLimit.maximum.map { Array(agenda.prefix($0)) } ?? agenda
-        appIndex.setMeetings(meetings.map(Self.entry(for:)))
+        let now = clock.now
+        appIndex.setMeetings(meetings.map { Self.entry(for: $0, now: now) })
     }
 
-    private static func entry(for meeting: MeetingEvent) -> AppEntry {
+    private static func entry(for meeting: MeetingEvent, now: Date) -> AppEntry {
         AppEntry(
             id: meeting.entryID, name: meeting.title,
             url: URL(
@@ -188,6 +189,7 @@ final class CalendarCoordinator {
                     + (meeting.id.addingPercentEncoding(withAllowedCharacters: .alphanumerics)
                         ?? ""))!,
             bundleID: nil, kind: .meeting,
+            subtitle: MeetingTimeFormat.subtitle(for: meeting, now: now),
             matchAliases: [meeting.calendarName],
             symbolName: meeting.link?.provider.sfSymbol ?? "calendar")
     }
