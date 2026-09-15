@@ -169,8 +169,10 @@ final class PalettePanel: NSPanel {
             return
         }
         // A footer menu owns the keyboard. See docs/features/palette.md#menu-open-input-freeze.
+        // The Actions panel is the one exception: its own onKeyPress handlers read these as its filter.
         if event.type == .keyDown,
             paletteState?.menuOpen == true,
+            paletteState?.menuIsFilterable != true,
             event.modifierFlags.isDisjoint(with: [.command, .control]),
             !Self.menuNavKeys.contains(Int(event.keyCode))
         {

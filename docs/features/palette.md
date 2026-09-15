@@ -454,6 +454,25 @@ frozen instead:
   force-casts its field editor to a private subclass, so vending a custom one crashes — only the
   existing one can be tuned.
 
+**The ⌘K Actions panel is the one menu exempt from the freeze**, so it can filter by typing, the way
+Raycast's own Action Panel does. `PaletteState.menuIsFilterable` mirrors `openMenu == .actions`
+alongside `menuOpen`; while it's true, `PalettePanel.sendEvent` stops swallowing and lets the
+keystroke reach SwiftUI. `RootPaletteView`'s row-chords `onKeyPress` handler — which already runs
+before the search field's own text insertion, the same way plain ↵ does (see below) — claims every
+such key for `actionsFilter` instead: a character appends, backspace trims, and both reset
+`menuSelection` to 0. The search field's real, bound `vm.query` is never touched, so the underlying
+list is exactly as the user left it when the panel closes. `actionsFilter` resets to `""` on every
+`openMenu` transition. Because the filter never uses the frozen field's own text-input machinery, it
+does not support IME composition — plain text only, the same restriction `ASCIIKeyboardLayout`
+already carries for chords.
+
+Filtering itself lives in `RootPaletteView.filteredActions`, applied to whatever `PaletteScreen.actions(at:)`
+returns before it's wrapped as a `PaletteMenuContent` — a screen that overrides `menuContent` directly
+instead (`ExtensionCommandScreen` is the only one) returns `nil` from `actions(at:)` and is left alone,
+exactly as untouched as every other menu. `PopoverMenuContent.filterQuery` carries the typed text down
+into `PopoverMenu`'s own rendering, which is also where an empty result set draws "No matching actions"
+rather than a blank panel.
+
 ## ↵ never commits the search field
 
 Plain ↵ is claimed by `RootPaletteView`'s own `onKeyPress` whenever the search field holds focus, and

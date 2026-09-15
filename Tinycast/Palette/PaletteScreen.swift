@@ -73,7 +73,7 @@ typealias MenuPanelClipPath =
                     PopoverMenu(
                         header: popover.header, items: popover.items, selection: selection,
                         width: width, onActivate: onActivate,
-                        attachment: corner.popoverAttachment))
+                        attachment: corner.popoverAttachment, filterQuery: popover.filterQuery))
             },
             activate: { popover.items[$0].action() },
             isLoading: { popover.items[$0].isLoading },

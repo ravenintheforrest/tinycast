@@ -34,6 +34,8 @@ struct RootPaletteView: View {
     @State private var selectionIsRunning = false
     /// Highlighted row of whichever menu is open; each open path sets where it starts.
     @State private var menuSelection = 0
+    /// Typed while the Actions panel is open; narrows its rows. Empty shows every row.
+    @State private var actionsFilter = ""
     /// The argument field whose choices are up, so `menuContent` can rebuild the same menu.
     @State private var argumentOptionsField: String?
     @State private var menuPanel = MenuPanelController()
@@ -160,6 +162,15 @@ struct RootPaletteView: View {
             })
     }
 
+    /// Narrows the Actions panel to rows matching what's typed; the query itself always shows.
+    private func filteredActions(_ content: PopoverMenuContent, query: String) -> PopoverMenuContent {
+        let items =
+            query.isEmpty
+            ? content.items
+            : content.items.filter { $0.title.localizedCaseInsensitiveContains(query) }
+        return PopoverMenuContent(header: content.header, items: items, filterQuery: query)
+    }
+
     /// The bottom-left app menu content (About / Support / Settings).
     private var appMenuContent: PopoverMenuContent {
         PopoverMenuContent(items: [
@@ -180,8 +191,14 @@ struct RootPaletteView: View {
         switch openMenu {
         case .actions:
             let screen = screen
-            return screen.menuContent(
-                at: selection(in: screen), menuSelection: $menuSelection,
+            let sel = selection(in: screen)
+            // Only a `PopoverMenuContent`-backed panel is filterable; an extension supplies its own.
+            guard let content = screen.actions(at: sel) else {
+                return screen.menuContent(
+                    at: sel, menuSelection: $menuSelection, onActivate: activateMenuItem)
+            }
+            return PaletteMenuContent(
+                popover: filteredActions(content, query: actionsFilter), selection: $menuSelection,
                 onActivate: activateMenuItem)
         case .app:
             return PaletteMenuContent(
@@ -357,11 +374,15 @@ struct RootPaletteView: View {
             // One optional makes "exactly one menu" structural; this only mirrors it for the panel.
             .onChange(of: openMenu) {
                 vm.menuOpen = menuOpen
+                vm.menuIsFilterable = openMenu == .actions
+                actionsFilter = ""
                 guard menuOpen else { return }
                 syncMenuPanel(presenting: true)
             }
             // The hosted tree is its own hierarchy, so the highlight has to be pushed into it.
             .onChange(of: menuSelection) { syncMenuPanel(presenting: false) }
+            // Every keystroke narrows the Actions panel's rows, hosted in its own hierarchy too.
+            .onChange(of: actionsFilter) { syncMenuPanel(presenting: false) }
             .onDisappear {
                 menuPanel.hide()
                 (hostWindow as? PalettePanel)?.onHeaderFieldBoundaryArrow = nil
@@ -492,6 +513,28 @@ struct RootPaletteView: View {
                 // Same for a menu the footer doesn't offer: ⌘K opens exactly what the bar advertises.
                 guard screen.hasActions(at: selection(in: screen)) else { return .handled }
                 toggleActions()
+                return .handled
+            }
+            // While the Actions panel is open, everything otherwise unhandled edits its filter
+            // instead of a row chord — `sendEvent` now lets these through for exactly that reason.
+            .onKeyPress(phases: .down) { press in
+                guard openMenu == .actions, press.modifiers.isDisjoint(with: [.command, .control])
+                else { return .ignored }
+                let isDeleteKey = press.key == .delete || press.key == .deleteForward
+                if isDeleteKey {
+                    if !actionsFilter.isEmpty {
+                        actionsFilter.removeLast()
+                        menuSelection = 0
+                    }
+                    return .handled
+                }
+                if let character = press.characters.first,
+                    character.isLetter || character.isNumber || character.isSymbol
+                        || character.isPunctuation || character == " "
+                {
+                    actionsFilter.append(press.characters)
+                    menuSelection = 0
+                }
                 return .handled
             }
             // The screen answers row chords; a bare backspace is intercepted in `sendEvent`.

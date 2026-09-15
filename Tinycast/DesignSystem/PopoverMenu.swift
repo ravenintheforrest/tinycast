@@ -61,6 +61,8 @@ struct PopoverMenuItem {
 struct PopoverMenuContent {
     var header: String?
     let items: [PopoverMenuItem]
+    /// Non-nil draws a filter row under the header; the ⌘K Actions panel is the only menu that sets it.
+    var filterQuery: String?
 }
 
 /// The palette's own menu, hosted by `MenuPanelController` in a window of its own.
@@ -94,6 +96,8 @@ struct PopoverMenu: View {
     var width: CGFloat?
     let onActivate: (Int) -> Void
     var attachment = Attachment.none
+    /// Drawn as a filter row under the header when set; empty reads as the placeholder, not "no rows".
+    var filterQuery: String?
 
     /// The palette arms this only once the pointer has moved of its own accord.
     @Environment(PaletteState.self) private var palette
@@ -132,21 +136,29 @@ struct PopoverMenu: View {
                         headerLabel(header)
                         Color.clear.frame(height: metrics.size.menuRowSpacing)
                     }
-                    // Index-as-id is stable: a menu's rows never reorder while it is open.
-                    ForEach(items.indices, id: \.self) { index in
-                        VStack(alignment: .leading, spacing: 0) {
-                            rowBoundary(before: index)
+                    if let filterQuery {
+                        filterLabel(filterQuery)
+                        Color.clear.frame(height: metrics.size.menuRowSpacing)
+                    }
+                    if items.isEmpty, filterQuery != nil {
+                        noMatchesLabel
+                    } else {
+                        // Index-as-id is stable: a menu's rows never reorder while it is open.
+                        ForEach(items.indices, id: \.self) { index in
                             VStack(alignment: .leading, spacing: 0) {
-                                if let sectionTitle = items[index].sectionTitle {
-                                    sectionLabel(sectionTitle, isFirst: index == 0)
+                                rowBoundary(before: index)
+                                VStack(alignment: .leading, spacing: 0) {
+                                    if let sectionTitle = items[index].sectionTitle {
+                                        sectionLabel(sectionTitle, isFirst: index == 0)
+                                    }
+                                    PopoverMenuRow(item: items[index], selected: index == selection) {
+                                        onActivate(index)
+                                    }
                                 }
-                                PopoverMenuRow(item: items[index], selected: index == selection) {
-                                    onActivate(index)
-                                }
+                                .onContinuousHover { if case .active = $0 { hover(index) } }
                             }
-                            .onContinuousHover { if case .active = $0 { hover(index) } }
+                            .id(index)
                         }
-                        .id(index)
                     }
                 }
             }
@@ -184,15 +196,17 @@ struct PopoverMenu: View {
         min(contentHeight, viewportCapacity)
     }
 
-    private var viewportCapacity: CGFloat { metrics.size.menuRowsMaxHeight + headerExtent }
+    private var viewportCapacity: CGFloat {
+        metrics.size.menuRowsMaxHeight + headerExtent + filterExtent
+    }
 
     private var contentHeight: CGFloat {
-        let rows = CGFloat(items.count)
+        let rows = items.isEmpty && filterQuery != nil ? 1 : CGFloat(items.count)
         let separators = CGFloat(items.dropFirst().filter(\.startsSection).count)
         let regularGaps = max(rows - 1 - separators, 0)
         let separatorHeight = metrics.spacing.sm * 2 + Theme.Size.hairline
         var contentHeight =
-            headerExtent
+            headerExtent + filterExtent
             + rows * metrics.size.menuRowHeight + regularGaps * metrics.size.menuRowSpacing
             + separators * separatorHeight
         for (index, item) in items.enumerated() where item.sectionTitle != nil {
@@ -206,6 +220,34 @@ struct PopoverMenu: View {
         guard header != nil else { return 0 }
         return metrics.size.menuSectionHeader + metrics.spacing.xs * 1.5
             + metrics.size.menuRowSpacing
+    }
+
+    private var filterExtent: CGFloat {
+        guard filterQuery != nil else { return 0 }
+        return metrics.size.menuSectionHeader + metrics.size.menuRowSpacing
+    }
+
+    /// Typed text when there's any, else the placeholder — same row, so the panel never jumps.
+    private func filterLabel(_ query: String) -> some View {
+        HStack(spacing: metrics.spacing.xs) {
+            Image(systemName: "magnifyingglass")
+                .font(.system(size: metrics.scaled(Theme.Typography.menuSymbolSize)))
+                .foregroundStyle(.secondary)
+            Text(query.isEmpty ? "Search actions…" : query)
+                .font(metrics.typography.menuRow)
+                .foregroundStyle(query.isEmpty ? Color.secondary : Color.primary)
+                .lineLimit(1)
+        }
+        .frame(height: metrics.size.menuSectionHeader, alignment: .leading)
+        .padding(.horizontal, metrics.spacing.lg)
+    }
+
+    private var noMatchesLabel: some View {
+        Text("No matching actions")
+            .font(metrics.typography.menuRow)
+            .foregroundStyle(.secondary)
+            .frame(height: metrics.size.menuRowHeight, alignment: .leading)
+            .padding(.horizontal, metrics.spacing.lg)
     }
 
     /// Tighter below than above, so a header belongs to the rows under it, not between two groups.
