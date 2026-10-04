@@ -40,6 +40,9 @@ only moves when you push it.
 Same scheme as upstream (`docs/signing.md`), different key: the `Tinycast Self-Signed` identity in
 this Mac's login keychain, exported to the fork secrets `SIGNING_P12_BASE64` / `SIGNING_P12_PASSWORD`.
 **Keep that identity.** Losing it means a one-time manual reinstall and re-granting Accessibility.
+Created 2026-10-04 with docs/signing.md §1, plus `-legacy` on `openssl pkcs12 -export` (OpenSSL 3's
+default encryption is unreadable by `security import`); secrets set straight from that `.p12`.
+`find-identity` showing `CSSMERR_TP_NOT_TRUSTED` is expected for a self-signed identity.
 
 ## Building locally
 
