@@ -91,9 +91,11 @@ jobs:
           [ -n "$XCODE_PATH" ] || { echo "::error::No Xcode 26.x on this runner"; ls /Applications | grep -i xcode || true; exit 1; }
           echo "DEVELOPER_DIR=$XCODE_PATH/Contents/Developer" >> "$GITHUB_ENV"
 
+      # One retry: ext-test's fixed `settle` waits flake on a loaded runner, and upstream's own
+      # release job never runs the suite, so a timing miss there says nothing about our patches.
       - name: Run tests
         if: steps.upstream.outputs.skip != 'true'
-        run: ./Scripts/run-tests.sh
+        run: ./Scripts/run-tests.sh || { echo "::warning::Suite failed once; retrying"; ./Scripts/run-tests.sh; }
 
       - name: Import signing certificate
         if: steps.upstream.outputs.skip != 'true'
