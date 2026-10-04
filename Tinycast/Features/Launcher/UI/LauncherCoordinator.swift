@@ -280,6 +280,13 @@ final class LauncherCoordinator {
         ranking.reset(itemKey: app.preferenceKey)
     }
 
+    /// The row's own recorder in Settings is the one place a binding is made or replaced.
+    func showShortcutSettings(for action: HotKeyAction) {
+        paletteCoordinator.hidePalette(restoreFocus: false)
+        let target = SettingsTarget.shortcut(for: action)
+        settingsCoordinator.showSettings(tab: target.tab, revealing: target)
+    }
+
     func showInFinder(_ app: AppEntry) {
         paletteCoordinator.hidePalette(restoreFocus: false)
         AppLauncher.showInFinder(app.url)

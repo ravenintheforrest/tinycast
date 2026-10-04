@@ -56,6 +56,12 @@ enum AppActionsMenu {
                     title: "Hide from Search", systemImage: "eye.slash", shortcut: "⇧⌘H",
                     action: onHideFromSearch))
         }
+        if let action = app.shortcutAction, core.visibility.allowsHotKey(action) {
+            items.append(
+                PopoverMenuItem(title: "Set Shortcut…", systemImage: "keyboard") {
+                    core.launcherCoordinator.showShortcutSettings(for: action)
+                })
+        }
         if running, app.kind == .application {
             items.append(
                 PopoverMenuItem(

@@ -347,7 +347,8 @@ result will answer to is visible without opening anything.
 Editing lives in Settings only — an alias is one-time configuration like a shortcut, not a
 per-invocation action, so the ⌘K menu stays out of it. Visibility is the one exception, and only in
 one direction: an unwanted result is noticed while searching, so ⌘K can hide a row, but putting it
-back is still the pane's checkbox. Every pane built
+back is still the pane's checkbox. A shortcut gets a doorway rather than an editor: ⌘K's
+[Set Shortcut…](#setting-a-shortcut) opens the row's own recorder in Settings. Every pane built
 on `LauncherItemsSection` puts an `AliasField` on each row, dressed like the `ShortcutRecorder`
 beside it; edits store as typed and trim when the field loses focus, and a blank means none. That
 list filters by **membership only**, keeping the index's name order — re-ranking it per keystroke
@@ -726,6 +727,19 @@ the move `selectFavorite` already makes. The palette stays open on the same quer
 untouched. One function answers both the menu row and the chord, and it re-tests eligibility rather
 than trusting the caller, so ⇧⌘H falls through to whatever else wants the press on a row that offers
 no such menu item.
+
+## Setting a shortcut
+
+**Set Shortcut…** on a result's ⌘K menu hides the palette and opens Settings on the row that already
+binds that entry, scrolled into view with its recorder listening — the launcher grows no second
+binding UI, and a bound entry reviews or replaces its chord in the same place. It has no chord of its
+own. It is offered when `AppEntry.shortcutAction` names an action (`hotKeyAction`, plus an extension
+command's entry-ID key) and `VisibilityStore.allowsHotKey` would let that action fire.
+
+`HotKeyAction.settingsTab` (beside `ShortcutRecorder`) names the pane that seats each action's
+recorder, deferring to `CommandID.owner` for commands. `LauncherCoordinator.showShortcutSettings`
+reveals `SettingsTarget.shortcut`; how the pane lands on the row is in
+[ui.md](../ui.md#settings).
 
 ## Reveal in Finder
 

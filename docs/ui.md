@@ -755,6 +755,12 @@ system-drawn and a pane reads exactly as macOS System Settings does.
   which anchor is lit from `\.settingsFlash` rather than having it threaded down.
   `SettingsScrollRequest` carries a token because picking the same result twice has to scroll again
   rather than compare equal and do nothing.
+- **`SettingsTarget.shortcut` lands on a recorder, not a name** — ⌘K's Set Shortcut… sends it. Every
+  `ShortcutRecorder` carries that id, and opens itself for recording once it is the target *and* its
+  window is key (the capture cancels on any resign). Nothing pulses; the open recorder is the mark.
+  A `SettingsFilterField` clears itself on arrival so it cannot hide the row, the Extensions pane
+  expands the owning extension, and a `LauncherItemsTable` row — whose ids stay inside its own
+  hosting view — gets a stand-in at the row's offset for the pane's scroller to aim at.
 - **The pulse is a pill on the name, and nothing around it is touched.** A grouped `Form` applies a
   `.background` to a row's whole *content* box, so lighting a section — or a row — paints ragged
   blocks at the width of every label, button and footer paragraph in it. (`.listRowBackground` is a

@@ -113,14 +113,22 @@ enum SettingsTarget: Hashable, Sendable {
     case section(SettingsAnchor)
     /// The row's visible title, which is also the catalog entry's — they are the same string.
     case row(SettingsAnchor, String)
+    /// The `ShortcutRecorder` for one action, which opens for recording once it is revealed.
+    case shortcut(SettingsTab, HotKeyAction)
 
-    var anchor: SettingsAnchor {
+    var anchor: SettingsAnchor? {
         switch self {
         case .section(let anchor), .row(let anchor, _): return anchor
+        case .shortcut: return nil
         }
     }
 
-    var tab: SettingsTab { anchor.tab }
+    var tab: SettingsTab {
+        switch self {
+        case .section(let anchor), .row(let anchor, _): return anchor.tab
+        case .shortcut(let tab, _): return tab
+        }
+    }
 }
 
 /// One jump asked for by a search result. The token is what makes picking the same result twice

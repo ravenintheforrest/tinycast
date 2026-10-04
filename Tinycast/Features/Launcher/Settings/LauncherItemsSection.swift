@@ -62,6 +62,7 @@ struct LauncherItemsList: View {
     @Environment(VisibilityStore.self) private var visibility
     @Environment(AliasStore.self) private var aliases
     @Environment(HotKeyManager.self) private var hotKeys
+    @Environment(SettingsNavigationState.self) private var navigation
     @State private var recorderFrame: CGRect?
 
     var body: some View {
@@ -75,10 +76,25 @@ struct LauncherItemsList: View {
             // One row holding the table: a `Form` realizes every row it is handed.
             LauncherItemsTable(
                 entries: entries, isEnabled: isEnabled,
-                visibility: visibility, aliases: aliases, hotKeys: hotKeys,
+                visibility: visibility, aliases: aliases, hotKeys: hotKeys, navigation: navigation,
                 recorderFrame: $recorderFrame
             )
             .overlay(alignment: .topLeading) { recorderStandIn }
+            .overlay(alignment: .top) { revealStandIn }
+        }
+    }
+
+    /// A hosted row's ids never reach the pane's scroller, so the revealed row gets one out here.
+    @ViewBuilder
+    private var revealStandIn: some View {
+        if let target = navigation.scrollRequest?.target, case .shortcut(_, let action) = target,
+            let row = entries.firstIndex(where: { $0.hotKeyAction == action })
+        {
+            Color.clear
+                .frame(height: LauncherItemsTable.rowHeight)
+                .id(target)
+                .padding(.top, LauncherItemsTable.top(ofRow: row))
+                .allowsHitTesting(false)
         }
     }
 

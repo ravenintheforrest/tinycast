@@ -66,9 +66,7 @@ struct ExtensionsSettingsView: View {
             ExtensionGitHubPanel(onClose: { installingFromGitHub = false })
         }
         .onChange(of: navigation.scrollRequest, initial: true) {
-            if case .row(.extensionsInstalled, let name)? = navigation.scrollRequest?.target {
-                (expanded, filter) = (name, "")
-            }
+            if let name = revealedExtension { (expanded, filter) = (name, "") }
         }
         .onChange(of: core.extensions.installed.count) { Task { await measureReclaimable() } }
         .task {
@@ -176,6 +174,16 @@ struct ExtensionsSettingsView: View {
         Task {
             let failed = await core.extensions.update(names)
             if !failed.isEmpty { updateError = "Couldn't update \(failed.joined(separator: ", "))." }
+        }
+    }
+
+    /// A command's recorder sits inside its extension's disclosure, so revealing it opens that one.
+    private var revealedExtension: String? {
+        switch navigation.scrollRequest?.target {
+        case .row(.extensionsInstalled, let name)?: name
+        case .shortcut(_, .extensionCommand(let entryID))?:
+            ExtensionCommandRef(entryID: entryID)?.extensionName
+        default: nil
         }
     }
 

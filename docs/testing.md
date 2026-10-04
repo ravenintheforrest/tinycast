@@ -433,6 +433,8 @@ caches, TCC grants and login item, so this cannot disturb an installed copy.
   toggles that app
 - Recording captures a shortcut, and the old binding does not fire while recording
 - A conflicting binding is rejected and names its current owner
+- ⌘K › Set Shortcut… on an app, a built-in command, a pane-owned command and an extension command
+  each opens its own pane with that row in view and its recorder listening, even past a filter
 - A double-tap binding fires; Hyper Key remaps and its status dot is green
 - Every binding survives quit and relaunch
 - `Enable Commands` off leaves every pane-owned command listed, searchable and firing — Notes,

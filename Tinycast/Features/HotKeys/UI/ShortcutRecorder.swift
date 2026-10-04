@@ -8,11 +8,19 @@ struct ShortcutRecorder: View {
     var isQuiet = false
 
     @Environment(HotKeyManager.self) private var hotKeys
+    /// Optional: onboarding seats a recorder outside any Settings window.
+    @Environment(SettingsNavigationState.self) private var navigation: SettingsNavigationState?
+    @Environment(\.controlActiveState) private var windowState
     /// Observed so a modifier-only binding surfaces its warning when the grant changes.
     private var modifierTapMonitor: ModifierTapMonitor { hotKeys.modifierTapMonitor }
     @State private var hovered = false
 
     private var isRecording: Bool { hotKeys.recordingAction == action }
+
+    /// Waits for the key window: the capture listens only there, and any resign cancels it.
+    private var isRevealed: Bool {
+        navigation?.scrollRequest?.target == .shortcut(for: action) && windowState == .key
+    }
 
     /// Sits back a shade until pointed at, without reading as something you cannot press.
     private var unsetInk: Color {
@@ -25,6 +33,7 @@ struct ShortcutRecorder: View {
         // The width is kept either way, so a column of recorders stays aligned as they fill in.
         let showsFill = !isQuiet || isRecording || hovered || hotKeys.binding(for: action) != nil
         content
+            .id(SettingsTarget.shortcut(for: action))
             .padding(.horizontal, Theme.Spacing.sm + 1)
             .frame(width: Theme.Size.shortcutRecorder, height: 24)
             .background(shape.fill(Theme.Colors.cardFill).opacity(showsFill ? 1 : 0))
@@ -46,6 +55,9 @@ struct ShortcutRecorder: View {
             // A reused table row can hand this field another action while the old one records.
             .onChange(of: action) { old, _ in
                 if hotKeys.recordingAction == old { hotKeys.recordingAction = nil }
+            }
+            .onChange(of: isRevealed, initial: true) { _, revealed in
+                if revealed { hotKeys.recordingAction = action }
             }
             .animation(.easeOut(duration: 0.12), value: hovered)
     }
@@ -107,6 +119,30 @@ struct ShortcutRecorder: View {
             .allowsHitTesting(hovered)
         }
     }
+}
+
+extension HotKeyAction {
+    /// The pane that seats this action's `ShortcutRecorder`; move a recorder, move its case here.
+    var settingsTab: SettingsTab {
+        switch self {
+        case .togglePalette: .general
+        case .command(let id): id.owner ?? .commands
+        case .app: .applications
+        case .settingsPane: .systemSettings
+        case .customCommand: .commands
+        case .systemAction: .systemActions
+        case .windowCommand, .windowLayout, .windowRoom, .customWindowSize: .windowManagement
+        case .quicklink: .quicklinks
+        case .quickAction: .quickActions
+        case .appleShortcut: .appleShortcuts
+        case .snippet: .snippets
+        case .extensionCommand: .extensions
+        }
+    }
+}
+
+extension SettingsTarget {
+    static func shortcut(for action: HotKeyAction) -> Self { .shortcut(action.settingsTab, action) }
 }
 
 private struct ShortcutRecorderHitRegion: NSViewRepresentable {
