@@ -1,0 +1,159 @@
+name: Raven sync
+
+# Fork-only. Daily: when upstream ships a new stable release, merge it into `raven`, test, build,
+# sign with this fork's own "Tinycast Self-Signed" identity and publish it here, where the app's
+# updater (ReleaseFeed.feedRepository) picks it up. A merge conflict opens an issue instead.
+# The merge is never pushed: GITHUB_TOKEN may not push upstream's workflow edits, and `raven`
+# staying "patches only" keeps conflicts small. The release tag points at the raven commit used.
+run-name: "Raven sync #${{ github.run_number }}"
+
+on:
+  schedule:
+    - cron: "17 11 * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Rebuild even if this release was already published"
+        type: boolean
+        default: false
+
+permissions:
+  contents: write
+  issues: write
+
+concurrency:
+  group: raven-sync
+  cancel-in-progress: false
+
+env:
+  UPSTREAM: abue-ammar/tinycast
+  BRANCH: raven
+
+jobs:
+  sync:
+    runs-on: macos-26
+    steps:
+      - name: Find upstream's newest stable release
+        id: upstream
+        env:
+          GH_TOKEN: ${{ github.token }}
+          FORCE: ${{ inputs.force || 'false' }}
+        run: |
+          TAG="$(gh release list --repo "$UPSTREAM" --exclude-drafts --exclude-pre-releases \
+            --limit 1 --json tagName --jq '.[0].tagName')"
+          [ -n "$TAG" ] || { echo "::error::No upstream stable release found"; exit 1; }
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+          echo "version=${TAG#v}" >> "$GITHUB_OUTPUT"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1 && [ "$FORCE" != "true" ]; then
+            echo "Already published $TAG here; nothing to do."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - uses: actions/checkout@v7
+        if: steps.upstream.outputs.skip != 'true'
+        with:
+          ref: ${{ env.BRANCH }}
+          fetch-depth: 0
+
+      - name: Merge the upstream release into raven
+        if: steps.upstream.outputs.skip != 'true'
+        id: merge
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.upstream.outputs.tag }}
+        run: |
+          echo "raven_sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+          git config user.name "raven-sync[bot]"
+          git config user.email "raven-sync@users.noreply.github.com"
+          git remote add upstream "https://github.com/$UPSTREAM.git"
+          # Fetch the tag into a private ref so it is never pushed back as one of this fork's tags.
+          git fetch --no-tags upstream "refs/tags/$TAG:refs/upstream-tags/$TAG"
+          if git merge --no-edit -m "Merge upstream $TAG into raven" "refs/upstream-tags/$TAG"; then
+            exit 0
+          fi
+          CONFLICTS="$(git diff --name-only --diff-filter=U)"
+          git merge --abort
+          TITLE="Raven sync: $TAG conflicts with the raven patches"
+          BODY="$(printf 'Upstream %s no longer merges cleanly into `raven`.\n\nConflicting files:\n```\n%s\n```\n\nResolve locally (`git fetch upstream --tags && git merge %s` on `raven`), push, then re-run the Raven sync workflow.\n\nRun: %s/%s/actions/runs/%s' \
+            "$TAG" "$CONFLICTS" "$TAG" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID")"
+          if [ -z "$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "in:title \"$TITLE\"" --json number --jq '.[0].number')" ]; then
+            gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" --body "$BODY"
+          fi
+          echo "::error::Merge conflict with $TAG"
+          exit 1
+
+      - name: Select Xcode 26
+        if: steps.upstream.outputs.skip != 'true'
+        run: |
+          XCODE_PATH="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n1)"
+          [ -n "$XCODE_PATH" ] || { echo "::error::No Xcode 26.x on this runner"; ls /Applications | grep -i xcode || true; exit 1; }
+          echo "DEVELOPER_DIR=$XCODE_PATH/Contents/Developer" >> "$GITHUB_ENV"
+
+      - name: Run tests
+        if: steps.upstream.outputs.skip != 'true'
+        run: ./Scripts/run-tests.sh
+
+      - name: Import signing certificate
+        if: steps.upstream.outputs.skip != 'true'
+        env:
+          P12_BASE64: ${{ secrets.SIGNING_P12_BASE64 }}
+          P12_PASSWORD: ${{ secrets.SIGNING_P12_PASSWORD }}
+        run: |
+          KEYCHAIN="$RUNNER_TEMP/signing.keychain-db"
+          KPW="$(openssl rand -base64 24)"
+          echo "${P12_BASE64}" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security create-keychain -p "$KPW" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KPW" "$KEYCHAIN"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" -P "${P12_PASSWORD}" -A -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KPW" "$KEYCHAIN" >/dev/null
+          security list-keychains -d user -s "$KEYCHAIN" $(security list-keychains -d user | sed 's/"//g')
+          rm -f "$RUNNER_TEMP/cert.p12"
+
+      - name: Build app
+        if: steps.upstream.outputs.skip != 'true'
+        env:
+          VERSION: ${{ steps.upstream.outputs.version }}
+        run: |
+          xcodebuild -project Tinycast.xcodeproj -scheme Tinycast -configuration Release \
+            -derivedDataPath "$RUNNER_TEMP/DerivedData" \
+            ARCHS=arm64 ONLY_ACTIVE_ARCH=NO \
+            CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="Tinycast Self-Signed" \
+            OTHER_CODE_SIGN_FLAGS="--timestamp=none" \
+            PRODUCT_NAME="Tinycast" PRODUCT_BUNDLE_IDENTIFIER="com.tinycast.app" \
+            MARKETING_VERSION="$VERSION" CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" \
+            build
+
+      - name: Verify signature
+        if: steps.upstream.outputs.skip != 'true'
+        run: ./Scripts/verify-signature.sh "$RUNNER_TEMP/DerivedData/Build/Products/Release/Tinycast.app"
+
+      # `ditto --sequesterRsrc` is the only zip that keeps the seal verifiable for the updater.
+      - name: Package ZIP
+        if: steps.upstream.outputs.skip != 'true'
+        env:
+          VERSION: ${{ steps.upstream.outputs.version }}
+        run: |
+          mkdir -p dist
+          ditto -c -k --keepParent --sequesterRsrc \
+            "$RUNNER_TEMP/DerivedData/Build/Products/Release/Tinycast.app" "dist/Tinycast-${VERSION}.zip"
+
+      - name: Publish release
+        if: steps.upstream.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.upstream.outputs.tag }}
+          VERSION: ${{ steps.upstream.outputs.version }}
+          RAVEN_SHA: ${{ steps.merge.outputs.raven_sha }}
+        run: |
+          gh release view "$TAG" --repo "$UPSTREAM" --json body --jq .body > "$RUNNER_TEMP/notes.md"
+          printf '\n\n---\nRaven build: upstream %s merged with `raven` @ %s.\n' "$TAG" "$RAVEN_SHA" >> "$RUNNER_TEMP/notes.md"
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            gh release upload "$TAG" "dist/Tinycast-${VERSION}.zip" --repo "$GITHUB_REPOSITORY" --clobber
+          else
+            gh release create "$TAG" "dist/Tinycast-${VERSION}.zip" --repo "$GITHUB_REPOSITORY" \
+              --target "$RAVEN_SHA" --title "Tinycast ${VERSION} (raven)" \
+              --notes-file "$RUNNER_TEMP/notes.md" --latest
+          fi
