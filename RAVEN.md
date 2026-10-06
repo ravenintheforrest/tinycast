@@ -13,7 +13,7 @@ fork's releases.
 
 | Patch | Why it isn't upstream |
 | --- | --- |
-| **Set Shortcut…** in the ⌘K Actions menu — opens Settings at that entry's shortcut recorder | Declined in upstream #981 ("not planned") |
+| **Set Shortcut…** in the ⌘K Actions menu — records the hotkey inline in the palette, Raycast-style (`ShortcutRecorderScreen`) | Declined in upstream #981 ("not planned") |
 | `ReleaseFeed.feedRepository` → `ravenintheforrest/tinycast` (update checks only; release-note links still point upstream) | Fork-only plumbing |
 | `.github/workflows/raven-sync.yml` + this file | Fork-only plumbing |
 
