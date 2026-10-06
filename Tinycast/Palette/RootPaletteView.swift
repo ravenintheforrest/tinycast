@@ -112,6 +112,8 @@ struct RootPaletteView: View {
         case .extensionCommand:
             return ExtensionCommandScreen(
                 screen: extensionScreen, extensions: extensions, vm: vm, openActions: openActions)
+        case .shortcutRecorder:
+            return ShortcutRecorderScreen(coordinator: core.launcherCoordinator)
         }
     }
 

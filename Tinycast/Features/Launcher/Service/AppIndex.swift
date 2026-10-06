@@ -203,11 +203,6 @@ struct AppEntry: Identifiable, Hashable, Sendable {
         }
     }
 
-    /// Every bindable entry's action; an extension command's is keyed by entry ID instead.
-    var shortcutAction: HotKeyAction? {
-        kind == .extensionCommand ? .extensionCommand(entryID: id) : hotKeyAction
-    }
-
     /// Synthetic entries have no file to reveal; a destination is its record's own action.
     var canRevealInFinder: Bool { kind.descriptor.canRevealInFinder }
 
@@ -760,9 +755,12 @@ final class AppIndex {
                 && !($0.bundleID?.hasPrefix(Self.ownBundlePrefix) ?? false)
         }
         return LauncherSuggestions.select(from: eligible, now: usage.now) { entry in
-            LauncherSuggestions.Traits(
+            // `hotKeyAction` is nil for an extension command, whose shortcut is keyed by entry ID.
+            let action: HotKeyAction? =
+                entry.kind == .extensionCommand ? .extensionCommand(entryID: entry.id) : entry.hotKeyAction
+            return LauncherSuggestions.Traits(
                 signals: signals(for: entry, usage: usage), installedAt: entry.installedAt,
-                hasHotKey: entry.shortcutAction.flatMap(hotKeys.binding(for:)) != nil,
+                hasHotKey: action.flatMap(hotKeys.binding(for:)) != nil,
                 priority: CommandCatalog.command(for: entry)?.suggestionPriority)
         }
     }

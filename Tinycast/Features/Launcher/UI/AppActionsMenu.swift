@@ -59,7 +59,7 @@ enum AppActionsMenu {
         if let action = app.shortcutAction, core.visibility.allowsHotKey(action) {
             items.append(
                 PopoverMenuItem(title: "Set Shortcut…", systemImage: "keyboard") {
-                    core.launcherCoordinator.showShortcutSettings(for: action)
+                    core.launcherCoordinator.recordShortcut(for: app, action: action)
                 })
         }
         if running, app.kind == .application {

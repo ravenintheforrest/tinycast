@@ -330,7 +330,6 @@ struct SettingsFilterField: View {
     @Binding var query: String
     /// The plain field has no bezel: without this only the glyphs are a target.
     @FocusState private var focused: Bool
-    @Environment(SettingsNavigationState.self) private var navigation: SettingsNavigationState?
 
     var body: some View {
         HStack(spacing: Theme.Spacing.sm) {
@@ -355,10 +354,6 @@ struct SettingsFilterField: View {
         }
         .contentShape(.rect)
         .onTapGesture { focused = true }
-        // A shortcut reveal lands on one row, which a leftover filter could be hiding.
-        .onChange(of: navigation?.scrollRequest, initial: true) {
-            if case .shortcut? = navigation?.scrollRequest?.target { query = "" }
-        }
     }
 }
 

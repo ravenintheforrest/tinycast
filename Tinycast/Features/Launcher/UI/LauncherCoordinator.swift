@@ -280,11 +280,26 @@ final class LauncherCoordinator {
         ranking.reset(itemKey: app.preferenceKey)
     }
 
-    /// The row's own recorder in Settings is the one place a binding is made or replaced.
-    func showShortcutSettings(for action: HotKeyAction) {
-        paletteCoordinator.hidePalette(restoreFocus: false)
-        let target = SettingsTarget.shortcut(for: action)
-        settingsCoordinator.showSettings(tab: target.tab, revealing: target)
+    /// Set before the recorder screen opens, which reads it as it builds, so nothing observes it.
+    private(set) var shortcutRecording: ShortcutRecording?
+
+    /// Records in place, over the search it came from, rather than sending the reader to Settings.
+    func recordShortcut(for app: AppEntry, action: HotKeyAction) {
+        shortcutRecording = ShortcutRecording(
+            entry: app, action: action, previous: core.hotKeys.binding(for: action))
+        paletteCoordinator.navigate(to: .shortcutRecorder)
+        core.hotKeys.recordingAction = action
+    }
+
+    /// Every way the capture ends lands back on the row; only a binding that changed is reported.
+    func finishRecordingShortcut() {
+        guard let recording = shortcutRecording else { return }
+        shortcutRecording = nil
+        if core.palette.mode == .shortcutRecorder { _ = core.palette.pop() }
+        let binding = core.hotKeys.binding(for: recording.action)
+        guard binding != recording.previous else { return }
+        let message = binding.map { "Shortcut set to \($0.keycaps.joined())" }
+        core.showMessage(message ?? "Shortcut removed")
     }
 
     func showInFinder(_ app: AppEntry) {

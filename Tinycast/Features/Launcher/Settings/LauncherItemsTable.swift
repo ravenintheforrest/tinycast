@@ -8,7 +8,6 @@ struct LauncherItemsTable: NSViewRepresentable {
     let visibility: VisibilityStore
     let aliases: AliasStore
     let hotKeys: HotKeyManager
-    let navigation: SettingsNavigationState
     /// The open recorder's bounds in this view's space; nil while nothing is recording.
     @Binding var recorderFrame: CGRect?
 
@@ -16,11 +15,6 @@ struct LauncherItemsTable: NSViewRepresentable {
     static let tableOverhang: CGFloat = 10
     static let searchDividerHeight: CGFloat = 1
     static let rowHeight: CGFloat = 45
-
-    /// Where a row starts in this view's space, the table hanging up into the Form row's padding.
-    static func top(ofRow row: Int) -> CGFloat {
-        CGFloat(row) * rowHeight - tableOverhang - searchDividerHeight
-    }
 
     func makeCoordinator() -> Coordinator { Coordinator() }
 
@@ -128,8 +122,7 @@ struct LauncherItemsTable: NSViewRepresentable {
         private func content(for row: Int, of list: LauncherItemsTable) -> LauncherItemCell {
             LauncherItemCell(
                 entry: list.entries[row], showsDivider: row > 0, isEnabled: list.isEnabled,
-                visibility: list.visibility, aliases: list.aliases, hotKeys: list.hotKeys,
-                navigation: list.navigation)
+                visibility: list.visibility, aliases: list.aliases, hotKeys: list.hotKeys)
         }
     }
 }
@@ -237,7 +230,6 @@ private struct LauncherItemCell: View {
     let visibility: VisibilityStore
     let aliases: AliasStore
     let hotKeys: HotKeyManager
-    let navigation: SettingsNavigationState
     var onRecorderFrame: @MainActor (CGRect?) -> Void = { _ in }
     var onTab: @MainActor () -> Bool = { false }
 
@@ -263,6 +255,5 @@ private struct LauncherItemCell: View {
         .environment(visibility)
         .environment(aliases)
         .environment(hotKeys)
-        .environment(navigation)
     }
 }
