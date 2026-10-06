@@ -171,6 +171,16 @@ struct ExtensionTests {
         try? await Task.sleep(nanoseconds: milliseconds * 1_000_000)
     }
 
+    /// Polls instead of sleeping a fixed time, which a loaded CI runner routinely overshoots.
+    @MainActor static func settle(
+        until condition: @MainActor () -> Bool, timeout: Duration = .seconds(3)
+    ) async {
+        let deadline = ContinuousClock.now.advanced(by: timeout)
+        while !condition(), ContinuousClock.now < deadline {
+            try? await Task.sleep(for: .milliseconds(10))
+        }
+    }
+
     // MARK: - Results
 
     nonisolated(unsafe) static var failures = 0

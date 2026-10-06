@@ -585,6 +585,7 @@ extension ExtensionTests {
         check("install does not run a menu command", boots.isEmpty && metadata.menuBarCommands().isEmpty)
         manager.run(first, command: first.manifest.commands[0])
         await settle(400)
+        await settle(until: { !manager.isRunning && lastRuntime == nil })
         check("settled menu keeps only a snapshot", !manager.isRunning && lastRuntime == nil)
         check("manual launch snapshots title", snapshot(firstRef)?.title == "userInitiated")
         check(
@@ -665,6 +666,7 @@ extension ExtensionTests {
                 && storage.localStorageValue(extension: "first", key: "completed") == .number(2))
         secondController.menuDidClose(secondController.menu)
         await settle(200)
+        await settle(until: { !manager.isRunning && lastRuntime == nil })
         check("reopened action sessions unload after closing", !manager.isRunning && lastRuntime == nil)
 
         controller.menuWillOpen(controller.menu)
@@ -714,11 +716,13 @@ extension ExtensionTests {
                 item.isEnabled && item.representedObject == nil)
             controller.menuDidClose(controller.menu)
             controller.menu.performActionForItem(at: index)
-            await settle(400)
-            check(
-                "clicking immediately after opening runs the fresh action and unloads",
+            let ranAndUnloaded: @MainActor () -> Bool = {
                 storage.localStorageValue(extension: "first", key: "confirmed") == .bool(true)
-                    && boots.count == beforeEarlyClick + 1 && !manager.isRunning && lastRuntime == nil)
+                    && boots.count == beforeEarlyClick + 1 && !manager.isRunning && lastRuntime == nil
+            }
+            await settle(400)
+            await settle(until: ranAndUnloaded)
+            check("clicking immediately after opening runs the fresh action and unloads", ranAndUnloaded())
         } else {
             check("early confirmation action exists", false)
         }
