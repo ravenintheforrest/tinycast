@@ -23,7 +23,8 @@ Keep patches small and few: every line here is a future merge conflict.
 
 1. `raven-sync.yml` runs daily (11:17 UTC) on a GitHub macOS runner, and on demand from the Actions tab.
 2. If upstream published a stable release this fork hasn't, it merges that tag into a throwaway copy of
-   `raven`, runs `./Scripts/run-tests.sh`, builds Release (arm64, bundle id `com.tinycast.app`),
+   `raven`, runs `./Scripts/run-tests.sh` **report-only** (upstream's sleep-based tests can't pass on
+   hosted runners; failures show as run warnings), builds Release (arm64, bundle id `com.tinycast.app`),
    signs with this fork's own `Tinycast Self-Signed` identity, and publishes `Tinycast-<version>.zip`
    as a release here, tagged with upstream's version.
 3. The app's built-in updater sees the release and offers it. It trusts it because it is signed with

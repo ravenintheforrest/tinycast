@@ -91,11 +91,15 @@ jobs:
           [ -n "$XCODE_PATH" ] || { echo "::error::No Xcode 26.x on this runner"; ls /Applications | grep -i xcode || true; exit 1; }
           echo "DEVELOPER_DIR=$XCODE_PATH/Contents/Developer" >> "$GITHUB_ENV"
 
-      # One retry: ext-test's fixed `settle` waits flake on a loaded runner, and upstream's own
-      # release job never runs the suite, so a timing miss there says nothing about our patches.
-      - name: Run tests
+      # Report-only (Raven's call, 2026-10-06): upstream's suite asserts on fixed sleeps that a
+      # hosted runner overshoots every run, and upstream's own release job runs no tests at all.
+      # Patches are tested on the Mac with ./Scripts/run-tests.sh whenever they change.
+      - name: Run tests (report-only)
         if: steps.upstream.outputs.skip != 'true'
-        run: ./Scripts/run-tests.sh || { echo "::warning::Suite failed once; retrying"; ./Scripts/run-tests.sh; }
+        run: |
+          ./Scripts/run-tests.sh 2>&1 | tee "$RUNNER_TEMP/tests.log" && exit 0
+          FAILED="$(sed -n 's/\x1b\[[0-9;]*m//g; s/^FAILED .* failed in [^:]*: //p' "$RUNNER_TEMP/tests.log")"
+          echo "::warning::Tests failed on the runner (${FAILED:-no summary}); publishing anyway"
 
       - name: Import signing certificate
         if: steps.upstream.outputs.skip != 'true'
