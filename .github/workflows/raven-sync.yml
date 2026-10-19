@@ -2,7 +2,7 @@ name: Raven sync
 
 # Fork-only. Daily: when upstream ships a new stable release, merge it into `raven`, test, build,
 # sign with this fork's own "Tinycast Self-Signed" identity and publish it here, where the app's
-# updater (ReleaseFeed.feedRepository) picks it up. A merge conflict opens an issue instead.
+# updater (ReleaseFeed.feedRepository) picks it up. A conflict outside the generated project file fails the run with a summary instead.
 # The merge is never pushed: GITHUB_TOKEN may not push upstream's workflow edits, and `raven`
 # staying "patches only" keeps conflicts small. The release tag points at the raven commit used.
 run-name: "Raven sync #${{ github.run_number }}"
@@ -19,7 +19,6 @@ on:
 
 permissions:
   contents: write
-  issues: write
 
 concurrency:
   group: raven-sync
@@ -74,14 +73,28 @@ jobs:
             exit 0
           fi
           CONFLICTS="$(git diff --name-only --diff-filter=U)"
-          git merge --abort
-          TITLE="Raven sync: $TAG conflicts with the raven patches"
-          BODY="$(printf 'Upstream %s no longer merges cleanly into `raven`.\n\nConflicting files:\n```\n%s\n```\n\nResolve locally (`git fetch upstream --tags && git merge %s` on `raven`), push, then re-run the Raven sync workflow.\n\nRun: %s/%s/actions/runs/%s' \
-            "$TAG" "$CONFLICTS" "$TAG" "$GITHUB_SERVER_URL" "$GITHUB_REPOSITORY" "$GITHUB_RUN_ID")"
-          if [ -z "$(gh issue list --repo "$GITHUB_REPOSITORY" --state open --search "in:title \"$TITLE\"" --json number --jq '.[0].number')" ]; then
-            gh issue create --repo "$GITHUB_REPOSITORY" --title "$TITLE" --body "$BODY"
+          # The project file is generated from project.yml, so regenerate it rather than merge it.
+          if [ "$CONFLICTS" = "Tinycast.xcodeproj/project.pbxproj" ]; then
+            git checkout --theirs Tinycast.xcodeproj/project.pbxproj
+            brew install xcodegen >/dev/null
+            xcodegen generate --quiet
+            git add Tinycast.xcodeproj
+            git commit --no-edit -q
+            echo "::notice::Regenerated project.pbxproj with xcodegen to resolve the merge"
+            exit 0
           fi
-          echo "::error::Merge conflict with $TAG"
+          git merge --abort
+          {
+            echo "## Upstream $TAG no longer merges cleanly into \`raven\`"
+            echo
+            echo "Conflicting files:"
+            echo '```'
+            echo "$CONFLICTS"
+            echo '```'
+            echo "Resolve on the Mac: \`git fetch upstream --no-tags 'refs/tags/$TAG:refs/tags/$TAG' && git switch raven && git merge $TAG\`,"
+            echo "run ./Scripts/run-tests.sh, push raven, then re-run this workflow."
+          } >> "$GITHUB_STEP_SUMMARY"
+          echo "::error::Merge conflict with $TAG in: $(echo $CONFLICTS)"
           exit 1
 
       - name: Select Xcode 26

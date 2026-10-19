@@ -29,9 +29,11 @@ Keep patches small and few: every line here is a future merge conflict.
    as a release here, tagged with upstream's version.
 3. The app's built-in updater sees the release and offers it. It trusts it because it is signed with
    the same certificate as the running copy.
-4. **Conflict?** The job opens an issue here instead of publishing (GitHub emails you). Resolve locally:
-   `git fetch upstream --tags && git switch raven && git merge vX.Y.Z`, fix, run tests, push `raven`,
-   re-run the workflow.
+4. **Conflict?** A conflict only in the generated `project.pbxproj` is resolved in CI (upstream's copy +
+   `xcodegen generate`). Anything else fails the run with the conflicting files in the run summary
+   (GitHub emails you; issues are disabled on this fork). Resolve on the Mac:
+   `git fetch upstream --no-tags 'refs/tags/vX.Y.Z:refs/tags/vX.Y.Z' && git switch raven && git merge vX.Y.Z`,
+   fix, run tests, push `raven`, re-run the workflow.
 
 The merge is never pushed by CI (`GITHUB_TOKEN` can't push upstream's workflow edits), so `raven`
 only moves when you push it.
