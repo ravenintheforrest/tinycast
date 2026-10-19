@@ -53,7 +53,7 @@ default encryption is unreadable by `security import`); secrets set straight fro
 xcodebuild -project Tinycast.xcodeproj -scheme Tinycast -configuration Release \
   -derivedDataPath /tmp/tc-build ARCHS=arm64 ONLY_ACTIVE_ARCH=NO \
   CODE_SIGN_STYLE=Manual CODE_SIGN_IDENTITY="Tinycast Self-Signed" OTHER_CODE_SIGN_FLAGS="--timestamp=none" \
-  PRODUCT_NAME=Tinycast PRODUCT_BUNDLE_IDENTIFIER=com.tinycast.app MARKETING_VERSION=<upstream version> build
+  PRODUCT_NAME=Tinycast TINYCAST_BUNDLE_IDENTIFIER=com.tinycast.app MARKETING_VERSION=<upstream version> build
 ```
 
 A patch-only change keeps upstream's version number, so the updater won't offer it. Install that
